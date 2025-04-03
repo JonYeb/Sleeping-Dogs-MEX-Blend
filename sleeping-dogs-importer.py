@@ -228,6 +228,8 @@ def ddsheader():
 
 def bin_parser(filename):
     global g, model_id, dirname
+
+    print("Starting bin_parser function")
     
     streams = {}
     materials = {}
@@ -235,9 +237,13 @@ def bin_parser(filename):
     mesh_list = []
     meshID = 0
     bonenamelist = []
-    
+
+    file_size = g.fileSize()
+    print(f"File size: {file_size} bytes")
+
     while True:
         if g.tell() == g.fileSize():
+            print("End of file reached")
             break
         vm = g.i(4)
         t = g.tell()    
@@ -246,6 +252,7 @@ def bin_parser(filename):
         g.word(36)
         
         if vm[0] == -1742448933:
+            print("Processing bone section")
             vn = g.i(8)
             g.B(160)
             for m in range(vn[1]):
@@ -258,7 +265,12 @@ def bin_parser(filename):
                 print(v1, v2, v3, v4)
         
         if vm[0] == -843079536:  # texture
-            tempfile = open(filename.replace('.perm.', '.temp.'), 'rb')
+            print("Processing texture section")
+            temp_file_path = filename.replace('.perm.', '.temp.')
+            if not os.path.exists(temp_file_path):
+                print(f"Warning: Temp file not found: {temp_file_path}")
+                continue
+            tempfile = open(temp_file_path, 'rb')
             temp = BinaryReader(tempfile)
             vn = g.i(55)
             w, h, dxt = None, None, None
@@ -273,7 +285,7 @@ def bin_parser(filename):
                 w, h = 256, 256
             if vn[4] == 65542:
                 w, h = 128, 128
-            if vn[4] == 65541:  # Fixed typo from original script
+            if vn[4] == 65541:  # Fixed typo from original script, was 65542 initially
                 w, h = 64, 64
                 
             if vn[1] == 1:
@@ -297,9 +309,11 @@ def bin_parser(filename):
                 tempfile.seek(vn[12])
                 new.write(tempfile.read(vn[13]))
                 new.close()
+            print(f"Texture saved: {dirname + os.sep + str(vc[3])}.dds")
             tempfile.close()
         
         if vm[0] == 1845060531:  # meshes info section
+            print("Processing meshes info section")
             vn = g.i(15)
             vn = g.i(17)
             off = g.tell()
@@ -389,6 +403,7 @@ def bin_parser(filename):
                             g.seek(tn + vertexstream[0][3])
         
         if vm[0] == -168275601:  # material section
+            print("Processing material section")
             materials[str(vc[3])] = {}        
             vn = g.i(8)
             
@@ -418,12 +433,19 @@ def import_sleeping_dogs(context, filepath):
     model_id = create_object_name()
     dirname = os.path.dirname(filepath)
     ext = filepath.split('.')[-1].lower()
-    
-    if ext == 'bin':
-        file = open(filepath, 'rb')
-        g = BinaryReader(file)
-        bin_parser(filepath)
-        file.close()
+    try:
+        if 'bin' in ext:  # Accept both .bin and .perm.bin; was if ext == 'bin': before
+            file = open(filepath, 'rb')
+            g = BinaryReader(file)
+            bin_parser(filepath)
+            file.close()
+            print("Import completed")
+        else:
+            print(f"Unsupported file extension: {ext}")
+    except Exception as e:
+        print(f"Error during import: {str(e)}")
+        import traceback
+        traceback.print_exc()
     
     return {'FINISHED'}
 
