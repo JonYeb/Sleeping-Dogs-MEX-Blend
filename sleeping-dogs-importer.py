@@ -101,6 +101,13 @@ class Mesh:
         self.vertexgroupslist = []
     
     def draw(self):
+        print(f"Drawing mesh: {self.name}")
+        print(f"Vertices: {len(self.vertexlist)}, Faces: {len(self.indiceslist)//3}")
+        
+        if not self.vertexlist:
+            print("No vertices found, skipping mesh creation")
+            return
+            
         # Create a new mesh and object
         mesh_data = bpy.data.meshes.new(self.name)
         obj = bpy.data.objects.new(self.name, mesh_data)
@@ -108,29 +115,56 @@ class Mesh:
         # Link object to scene
         bpy.context.collection.objects.link(obj)
         
-        # Create mesh with vertices
-        bm = bmesh.new()
-        
-        # Add vertices
-        for v in self.vertexlist:
-            bm.verts.new((v[0], v[2], v[1]))  # Convert to Blender coordinate system
-        
-        bm.verts.ensure_lookup_table()
-        
-        # Add faces
-        face_count = len(self.indiceslist) // 3
-        for i in range(face_count):
+        # Method 1: Use BMesh (complex but robust)
+        try:
+            bm = bmesh.new()
+            
+            # Add vertices
+            vert_objs = []
+            for v in self.vertexlist:
+                # Swap Y and Z coordinates for Blender
+                vert_objs.append(bm.verts.new((v[0], v[2], v[1])))
+            
+            bm.verts.ensure_lookup_table()
+            
+            # Add faces
+            face_count = len(self.indiceslist) // 3
+            for i in range(face_count):
+                try:
+                    idx1 = self.indiceslist[i*3]
+                    idx2 = self.indiceslist[i*3+1]
+                    idx3 = self.indiceslist[i*3+2]
+                    
+                    if all(idx < len(bm.verts) for idx in [idx1, idx2, idx3]):
+                        bm.faces.new([bm.verts[idx1], bm.verts[idx2], bm.verts[idx3]])
+                except Exception as e:
+                    print(f"Error adding face {i}: {e}")
+            
+            # Finalize BMesh and update mesh
+            bm.to_mesh(mesh_data)
+            bm.free()
+            
+        except Exception as e:
+            print(f"BMesh method failed: {e}")
+            
+            # Method 2: Fall back to simple mesh creation method
             try:
-                v1 = bm.verts[self.indiceslist[i*3]]
-                v2 = bm.verts[self.indiceslist[i*3+1]]
-                v3 = bm.verts[self.indiceslist[i*3+2]]
-                bm.faces.new((v1, v2, v3))
+                # Prepare vertex and face data
+                vertices = [(v[0], v[2], v[1]) for v in self.vertexlist]
+                faces = []
+                
+                for i in range(0, len(self.indiceslist), 3):
+                    if i+2 < len(self.indiceslist):  # Make sure we have 3 indices
+                        faces.append((self.indiceslist[i], self.indiceslist[i+1], self.indiceslist[i+2]))
+                
+                # Create the mesh
+                mesh_data.from_pydata(vertices, [], faces)
+                mesh_data.update()
+                
+                print(f"Created mesh using fallback method with {len(vertices)} vertices and {len(faces)} faces")
             except Exception as e:
-                print(f"Error adding face {i}: {e}")
-        
-        # Finalize BMesh and update mesh
-        bm.to_mesh(mesh_data)
-        bm.free()
+                print(f"Simple mesh creation also failed: {e}")
+                return
         
         # Add UV data
         if self.vertexuvlist:
