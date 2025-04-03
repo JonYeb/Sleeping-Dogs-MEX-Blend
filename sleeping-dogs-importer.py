@@ -123,7 +123,15 @@ class Mesh:
             vert_objs = []
             for v in self.vertexlist:
                 # Swap Y and Z coordinates for Blender
-                vert_objs.append(bm.verts.new((v[0], v[2], v[1])))
+                vert_objs.append(bm.verts.new((v[0], v[1], v[2])))
+                # Try different coordinate mappings if the default doesn't work
+                # Blender uses right-handed Y-up, but game might use different system
+                # Option 1 (original):
+                #bm.verts.new((v[0], v[2], v[1]))
+                
+                # If that doesn't work, try these alternatives:
+                # Option 2: bm.verts.new((v[0], v[1], v[2]))
+                # Option 3: bm.verts.new((v[0], -v[2], v[1]))
             
             bm.verts.ensure_lookup_table()
             
@@ -165,17 +173,23 @@ class Mesh:
             except Exception as e:
                 print(f"Simple mesh creation also failed: {e}")
                 return
-        
-        # Add UV data
+
+
         if self.vertexuvlist:
             mesh_data.uv_layers.new(name="UVMap")
             uv_layer = mesh_data.uv_layers[-1].data
-            
-            for i, loop in enumerate(mesh_data.loops):
-                vidx = mesh_data.polygons[loop.polygon_index].vertices[loop.index % 3]
-                if vidx < len(self.vertexuvlist):
-                    uv = self.vertexuvlist[vidx]
-                    uv_layer[i].uv = (uv[0], 1.0 - uv[1])  # Flip Y for Blender
+            #for i, loop in enumerate(mesh_data.loops):
+            #    vidx = mesh_data.polygons[loop.polygon_index].vertices[loop.index % 3]
+            #    if vidx < len(self.vertexuvlist):
+            #        uv = self.vertexuvlist[vidx]
+            #        uv_layer[i].uv = (uv[0], 1.0 - uv[1])  # Flip Y for Blender
+            # Alternative UV assignment method
+            # Iterate through all loops directly
+            for loop_idx, loop in enumerate(mesh_data.loops):
+                vertex_idx = loop.vertex_index
+                if vertex_idx < len(self.vertexuvlist):
+                    uv = self.vertexuvlist[vertex_idx]
+                    uv_layer[loop_idx].uv = (uv[0], 1.0 - uv[1])  # Flip Y for Blender
         
         # Add vertex groups
         for vg in self.vertexgroupslist:
