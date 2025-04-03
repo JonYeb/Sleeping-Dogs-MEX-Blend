@@ -144,7 +144,9 @@ class Mesh:
                     idx3 = self.indiceslist[i*3+2]
                     
                     if all(idx < len(bm.verts) for idx in [idx1, idx2, idx3]):
-                        bm.faces.new([bm.verts[idx1], bm.verts[idx2], bm.verts[idx3]])
+                        # bm.faces.new([bm.verts[idx1], bm.verts[idx2], bm.verts[idx3]])
+                        # If that doesn't work, try reversed order:
+                        bm.faces.new([bm.verts[idx1], bm.verts[idx3], bm.verts[idx2]])
                 except Exception as e:
                     print(f"Error adding face {i}: {e}")
             
@@ -441,14 +443,26 @@ def bin_parser(filename):
                             x = g.h(1)[0] * 2**-14
                             y = g.h(1)[0] * 2**-14
                             z = g.h(1)[0] * 2**-14
-                            mesh.vertexlist.append([x, y, z])
+                            # Convert coordinates (try these different transformations)
+                            mesh.vertexlist.append([x, z, y])  # Option 1
+                            # If Option 1 doesn't work, try these alternatives:
+                            # mesh.vertexlist.append([x, -y, z])  # Option 2
+                            # mesh.vertexlist.append([x, y, -z])  # Option 3
+                            # mesh.vertexlist.append([x, y, z])  # original
                             g.seek(tn + vertexstream[0][3])
-                    
+
                     if vertexstream[0][3] == 12:
                         for n in range(vertexstream[0][4]):
                             tn = g.tell()
-                            mesh.vertexlist.append(g.f(3))
+                            v = g.f(3)  # [x, y, z]
+                            # Convert coordinates (try these different transformations)
+                            mesh.vertexlist.append([v[0], v[2], v[1]])  # Option 1
+                            # If Option 1 doesn't work, try these alternatives:
+                            # mesh.vertexlist.append([v[0], -v[1], v[2]])  # Option 2
+                            # mesh.vertexlist.append([v[0], v[1], -v[2]])  # Option 3
                             g.seek(tn + vertexstream[0][3])
+                            # mesh.vertexlist.append(g.f(3))
+                            # g.seek(tn + vertexstream[0][3])
         
         if vm[0] == -168275601:  # material section
             print("Processing material section")
